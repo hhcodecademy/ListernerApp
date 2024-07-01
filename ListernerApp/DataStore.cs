@@ -30,7 +30,7 @@ namespace ListernerApp
 
         public static User CreateUser(User user)
         {
-            var newUser = new User { Id = Users.Count(), Username = user.Username, Password = user.Password };
+            var newUser = new User { Id = Users.Count()+1, Username = user.Username, Password = user.Password };
             Users.Add(newUser);
             return newUser;
         }

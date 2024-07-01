@@ -7,7 +7,15 @@ namespace ListernerApp
 {
     internal class HttpManagment
     {
-        public static async Task HandleLoginRequest(HttpListenerRequest request, HttpListenerResponse response)
+
+        private readonly HttpListenerRequest request;
+        private readonly HttpListenerResponse response ;
+        public HttpManagment(HttpListenerContext context)
+        {
+            request = context.Request;
+            response = context.Response;
+        }
+        public  async Task HandleLoginRequest()
         {
             using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
             {
@@ -29,20 +37,20 @@ namespace ListernerApp
                 if (user != null)
                 {
                     string responseString = $"Login successful. User ID: {user.Id} for user name {user.Username}";
-                    setHttpResponse(response, HttpStatusCode.OK, responseString);
+                    setHttpResponse( HttpStatusCode.OK, responseString);
 
                 }
                 else
                 {
                     string responseString = "Invalid username or password";
-                    setHttpResponse(response, HttpStatusCode.Unauthorized, responseString);
+                    setHttpResponse( HttpStatusCode.Unauthorized, responseString);
 
                 }
             }
 
             response.Close();
         }
-        public static async Task HandleCreateUserRequest(HttpListenerRequest request, HttpListenerResponse response)
+        public  async Task HandleCreateUserRequest()
         {
             using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
             {
@@ -64,14 +72,14 @@ namespace ListernerApp
                 if (user != null)
                 {
                     string responseString = $"User exsist on Store. User ID: {user.Id} for user name {user.Username}";
-                    setHttpResponse(response, HttpStatusCode.OK, responseString);
+                    setHttpResponse( HttpStatusCode.OK, responseString);
 
                 }
                 else
                 {
                     var createdUser = DataStore.CreateUser(newUser);
                     string responseString = $"User succesfully created User ID: {createdUser.Id} for user name {createdUser.Username}";
-                    setHttpResponse(response, HttpStatusCode.OK, responseString);
+                    setHttpResponse( HttpStatusCode.OK, responseString);
 
                 }
             }
@@ -79,7 +87,7 @@ namespace ListernerApp
             response.Close();
         }
 
-        public static async Task HandleBalanceRequest(HttpListenerRequest request, HttpListenerResponse response)
+        public  async Task HandleBalanceRequest()
         {
             if (request.QueryString["Id"] != null && int.TryParse(request.QueryString["Id"], out int userId))
             {
@@ -91,12 +99,12 @@ namespace ListernerApp
                     UserBalance userBalance = DataStore.Balances.Find(b => b.UserId == userId);
 
                     string responseString = $"User balance: {userBalance.Balance}";
-                    setHttpResponse(response, HttpStatusCode.OK, responseString);
+                    setHttpResponse( HttpStatusCode.OK, responseString);
                 }
                 else
                 {
                     string responseString = "User not found";
-                    setHttpResponse(response, HttpStatusCode.NotFound, responseString);
+                    setHttpResponse( HttpStatusCode.NotFound, responseString);
 
                 }
             }
@@ -108,7 +116,7 @@ namespace ListernerApp
             response.Close();
         }
 
-        public static HttpListenerResponse setHttpResponse(HttpListenerResponse response, HttpStatusCode httpStatusCode, string responseString)
+        public  HttpListenerResponse setHttpResponse( HttpStatusCode httpStatusCode, string responseString)
         {
             byte[] buffer = Encoding.UTF8.GetBytes(responseString);
             response.ContentLength64 = buffer.Length;
