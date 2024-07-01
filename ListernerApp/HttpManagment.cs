@@ -14,24 +14,65 @@ namespace ListernerApp
                 string requestBody = await reader.ReadToEndAsync();
                 Console.WriteLine($"Received request body: {requestBody}");
 
-                // Deserialize the request body into a User object
-                User loginUser = JsonSerializer.Deserialize<User>(requestBody);
+                // Configure JsonSerializer options
+                JsonSerializerOptions options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true // Ensure case sensitivity
+                };
 
+                // Deserialize JSON to User object
+                User loginUser = JsonSerializer.Deserialize<User>(requestBody, options);
 
                 // Simple login check (for demonstration purposes)
                 User user = DataStore.Users.Find(u => u.Username == loginUser.Username && u.Password == loginUser.Password);
 
                 if (user != null)
                 {
-                    string responseString = $"Login successful. User ID: {user.Id}";
-                    response = setHttpResponse(response, responseString);
-                    response.StatusCode = (int)HttpStatusCode.OK;
+                    string responseString = $"Login successful. User ID: {user.Id} for user name {user.Username}";
+                    setHttpResponse(response, HttpStatusCode.OK, responseString);
+
                 }
                 else
                 {
                     string responseString = "Invalid username or password";
-                    response = setHttpResponse(response, responseString);
-                    response.StatusCode = (int)HttpStatusCode.Unauthorized;
+                    setHttpResponse(response, HttpStatusCode.Unauthorized, responseString);
+
+                }
+            }
+
+            response.Close();
+        }
+        public static async Task HandleCreateUserRequest(HttpListenerRequest request, HttpListenerResponse response)
+        {
+            using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
+            {
+                string requestBody = await reader.ReadToEndAsync();
+                Console.WriteLine($"Received request body: {requestBody}");
+
+                // Configure JsonSerializer options
+                JsonSerializerOptions options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true // Ensure case sensitivity
+                };
+
+                // Deserialize JSON to User object
+                User newUser = JsonSerializer.Deserialize<User>(requestBody, options);
+
+                // Simple  check (for create purposes)
+                User user = DataStore.Users.Find(u => u.Username == newUser.Username );
+
+                if (user != null)
+                {
+                    string responseString = $"User exsist on Store. User ID: {user.Id} for user name {user.Username}";
+                    setHttpResponse(response, HttpStatusCode.OK, responseString);
+
+                }
+                else
+                {
+                    var createdUser = DataStore.CreateUser(newUser);
+                    string responseString = $"User succesfully created User ID: {createdUser.Id} for user name {createdUser.Username}";
+                    setHttpResponse(response, HttpStatusCode.OK, responseString);
+
                 }
             }
 
@@ -50,14 +91,13 @@ namespace ListernerApp
                     UserBalance userBalance = DataStore.Balances.Find(b => b.UserId == userId);
 
                     string responseString = $"User balance: {userBalance.Balance}";
-                    response = setHttpResponse(response, responseString);
-                    response.StatusCode = (int)HttpStatusCode.OK;
+                    setHttpResponse(response, HttpStatusCode.OK, responseString);
                 }
                 else
                 {
                     string responseString = "User not found";
-                    response = setHttpResponse(response, responseString);
-                    response.StatusCode = (int)HttpStatusCode.NotFound;
+                    setHttpResponse(response, HttpStatusCode.NotFound, responseString);
+
                 }
             }
             else
@@ -68,11 +108,12 @@ namespace ListernerApp
             response.Close();
         }
 
-        public static HttpListenerResponse setHttpResponse(HttpListenerResponse response, string responseString)
+        public static HttpListenerResponse setHttpResponse(HttpListenerResponse response, HttpStatusCode httpStatusCode, string responseString)
         {
             byte[] buffer = Encoding.UTF8.GetBytes(responseString);
             response.ContentLength64 = buffer.Length;
             response.OutputStream.Write(buffer, 0, buffer.Length);
+            response.StatusCode = (int)httpStatusCode;
             return response;
         }
     }

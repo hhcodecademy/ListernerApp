@@ -37,6 +37,9 @@ namespace ListernerApp
                     case "/login":
                         await HttpManagment.HandleLoginRequest(request, response);
                         break;
+                    case "/create":
+                        await HttpManagment.HandleCreateUserRequest(request, response);
+                        break;
                     case "/balance":
                         await HttpManagment.HandleBalanceRequest(request, response);
                         break;
