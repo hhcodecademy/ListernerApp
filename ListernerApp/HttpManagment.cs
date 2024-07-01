@@ -7,122 +7,130 @@ namespace ListernerApp
 {
     internal class HttpManagment
     {
-
         private readonly HttpListenerRequest request;
-        private readonly HttpListenerResponse response ;
+        private readonly HttpListenerResponse response;
+
         public HttpManagment(HttpListenerContext context)
         {
             request = context.Request;
             response = context.Response;
         }
-        public  async Task HandleLoginRequest()
+
+        public async Task HandleLoginRequest()
         {
-            using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
+            try
             {
-                string requestBody = await reader.ReadToEndAsync();
-                Console.WriteLine($"Received request body: {requestBody}");
+                string requestBody = await ReadRequestBodyAsync();
+                User loginUser = DeserializeJson<User>(requestBody);
 
-                // Configure JsonSerializer options
-                JsonSerializerOptions options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true // Ensure case sensitivity
-                };
-
-                // Deserialize JSON to User object
-                User loginUser = JsonSerializer.Deserialize<User>(requestBody, options);
-
-                // Simple login check (for demonstration purposes)
                 User user = DataStore.Users.Find(u => u.Username == loginUser.Username && u.Password == loginUser.Password);
 
                 if (user != null)
                 {
                     string responseString = $"Login successful. User ID: {user.Id} for user name {user.Username}";
-                    setHttpResponse( HttpStatusCode.OK, responseString);
-
+                    SetHttpResponse(HttpStatusCode.OK, responseString);
                 }
                 else
                 {
-                    string responseString = "Invalid username or password";
-                    setHttpResponse( HttpStatusCode.Unauthorized, responseString);
-
+                    SetHttpResponse(HttpStatusCode.Unauthorized, "Invalid username or password");
                 }
             }
-
-            response.Close();
-        }
-        public  async Task HandleCreateUserRequest()
-        {
-            using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
+            catch (Exception ex)
             {
-                string requestBody = await reader.ReadToEndAsync();
-                Console.WriteLine($"Received request body: {requestBody}");
+                SetHttpResponse(HttpStatusCode.InternalServerError, $"Error processing request: {ex.Message}");
+            }
+            finally
+            {
+                response.Close();
+            }
+        }
 
-                // Configure JsonSerializer options
-                JsonSerializerOptions options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true // Ensure case sensitivity
-                };
+        public async Task HandleCreateUserRequest()
+        {
+            try
+            {
+                string requestBody = await ReadRequestBodyAsync();
+                User newUser = DeserializeJson<User>(requestBody);
 
-                // Deserialize JSON to User object
-                User newUser = JsonSerializer.Deserialize<User>(requestBody, options);
-
-                // Simple  check (for create purposes)
-                User user = DataStore.Users.Find(u => u.Username == newUser.Username );
+                User user = DataStore.Users.Find(u => u.Username == newUser.Username);
 
                 if (user != null)
                 {
-                    string responseString = $"User exsist on Store. User ID: {user.Id} for user name {user.Username}";
-                    setHttpResponse( HttpStatusCode.OK, responseString);
-
+                    string responseString = $"User exists on Store. User ID: {user.Id} for user name {user.Username}";
+                    SetHttpResponse(HttpStatusCode.OK, responseString);
                 }
                 else
                 {
                     var createdUser = DataStore.CreateUser(newUser);
-                    string responseString = $"User succesfully created User ID: {createdUser.Id} for user name {createdUser.Username}";
-                    setHttpResponse( HttpStatusCode.OK, responseString);
-
+                    string responseString = $"User successfully created. User ID: {createdUser.Id} for user name {createdUser.Username}";
+                    SetHttpResponse(HttpStatusCode.OK, responseString);
                 }
             }
-
-            response.Close();
+            catch (Exception ex)
+            {
+                SetHttpResponse(HttpStatusCode.InternalServerError, $"Error processing request: {ex.Message}");
+            }
+            finally
+            {
+                response.Close();
+            }
         }
 
-        public  async Task HandleBalanceRequest()
+        public async Task HandleBalanceRequest()
         {
-            if (request.QueryString["Id"] != null && int.TryParse(request.QueryString["Id"], out int userId))
+            try
             {
-
-                User user = DataStore.Users.Find(u => u.Id == userId);
-
-                if (user != null)
+                if (request.QueryString["Id"] != null && int.TryParse(request.QueryString["Id"], out int userId))
                 {
-                    UserBalance userBalance = DataStore.Balances.Find(b => b.UserId == userId);
+                    User user = DataStore.Users.Find(u => u.Id == userId);
 
-                    string responseString = $"User balance: {userBalance.Balance}";
-                    setHttpResponse( HttpStatusCode.OK, responseString);
+                    if (user != null)
+                    {
+                        UserBalance userBalance = DataStore.Balances.Find(b => b.UserId == userId);
+                        string responseString = $"User balance: {userBalance.Balance}";
+                        SetHttpResponse(HttpStatusCode.OK, responseString);
+                    }
+                    else
+                    {
+                        SetHttpResponse(HttpStatusCode.NotFound, "User not found");
+                    }
                 }
                 else
                 {
-                    string responseString = "User not found";
-                    setHttpResponse( HttpStatusCode.NotFound, responseString);
-
+                    SetHttpResponse(HttpStatusCode.BadRequest, "Invalid or missing user ID");
                 }
             }
-            else
+            catch (Exception ex)
             {
-                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                SetHttpResponse(HttpStatusCode.InternalServerError, $"Error processing request: {ex.Message}");
             }
-
-            response.Close();
+            finally
+            {
+                response.Close();
+            }
         }
 
-        public  HttpListenerResponse setHttpResponse( HttpStatusCode httpStatusCode, string responseString)
+        private async Task<string> ReadRequestBodyAsync()
+        {
+            using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
+            {
+                return await reader.ReadToEndAsync();
+            }
+        }
+
+        private T DeserializeJson<T>(string jsonString)
+        {
+            return JsonSerializer.Deserialize<T>(jsonString, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+
+        private void SetHttpResponse(HttpStatusCode httpStatusCode, string responseString)
         {
             byte[] buffer = Encoding.UTF8.GetBytes(responseString);
             response.ContentLength64 = buffer.Length;
             response.OutputStream.Write(buffer, 0, buffer.Length);
             response.StatusCode = (int)httpStatusCode;
-            return response;
         }
     }
+
+  
 }

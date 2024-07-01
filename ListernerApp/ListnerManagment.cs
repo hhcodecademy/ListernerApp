@@ -9,47 +9,79 @@ namespace ListernerApp
 {
     internal class ListnerManagment
     {
+        private static readonly HttpListener listener = new HttpListener();
+        private static readonly string URL = "http://localhost:5000/";
+
         public static async Task StartListener()
         {
-            // Create a new HttpListener instance
-            HttpListener listener = new HttpListener();
-
             // Define the prefixes (URLs) the listener should handle
-            listener.Prefixes.Add("http://localhost:5000/");
+            listener.Prefixes.Add(URL);
 
             // Start the listener
             listener.Start();
-            Console.WriteLine("Listening for requests on http://localhost:5000/");
+            Console.WriteLine($"Listening for requests on {URL}");
 
-            // Handle incoming requests
-            await HandleRequest(listener);
-        }
-        private static async Task HandleRequest(HttpListener listener)
-        {
-            while (true)
+            try
             {
-                HttpListenerContext context = await listener.GetContextAsync();
+                while (listener.IsListening)
+                {
+                    // Handle incoming requests
+                    await HandleRequest();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while handling requests: {ex.Message}");
+            }
+            finally
+            {
+                StopListener();
+            }
+        }
 
-                HttpManagment managment = new HttpManagment(context);
 
-                string absolutePath = context.Request.Url.AbsolutePath;
+
+        private static async Task HandleRequest()
+        {
+            var context = await listener.GetContextAsync();
+            HttpManagment management = new HttpManagment(context);
+            string absolutePath = context.Request.Url.AbsolutePath;
+
+            Console.WriteLine($"Received request for: {absolutePath}");
+
+            try
+            {
                 switch (absolutePath)
                 {
                     case "/login":
-                        await managment.HandleLoginRequest();
+                        await management.HandleLoginRequest();
                         break;
                     case "/create":
-                        await managment.HandleCreateUserRequest();
+                        await management.HandleCreateUserRequest();
                         break;
                     case "/balance":
-                        await managment.HandleBalanceRequest();
+                        await management.HandleBalanceRequest();
                         break;
                     default:
+                        context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                        await context.Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes("Endpoint not found"));
+                        context.Response.Close();
                         break;
                 }
-
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while handling request: {ex.Message}");
+                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                await context.Response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes("Internal server error"));
+                context.Response.Close();
+            }
+        }
 
+        public static void StopListener()
+        {
+            listener.Stop();
+            Console.WriteLine("Listener stopped.");
         }
     }
 }
